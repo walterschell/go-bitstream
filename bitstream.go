@@ -192,4 +192,11 @@ func (s *BitStream) AppendBitstream(other *BitStream) {
 	s.AppendBits(other.Size(), other.backingStore)
 }
 
-
+// Returns a byte array representation of the bitstream.
+// The size is the minimum number of bytes needed to represent the bits
+func (s *BitStream) ToBytes() []byte {
+	size := s.Size()
+	result := make([]byte, bytesNeededForBits(size))
+	copy(result, s.backingStore)
+	return result
+}
