@@ -1,4 +1,5 @@
 package smallcurve
+
 import (
 	"testing"
 )
@@ -58,5 +59,119 @@ func TestBitStreamAppendBit(t *testing.T) {
 	}
 	if stream.String() != "1011111111" {
 		t.Errorf("Expected 1011111111, got %s", stream.String())
+	}
+}
+
+func TestAppendByOne(t *testing.T) {
+	stream := BitStream{}
+	expected := ""
+	for i := 0; i < 1000; i++ {
+		stream.AppendBit(1)
+		expected += "1"
+		if stream.String() != expected {
+			t.Logf("Backing store: %v\n", stream.debugDump())
+			t.Fatalf("Expected %s, got %s", expected, stream.String())
+		}
+	}
+}
+
+func TestAppendByTwo(t *testing.T) {
+	stream := BitStream{}
+	expected := ""
+	for i := 0; i < 1000; i++ {
+		stream.AppendUint(3, 2)
+		expected += "11"
+		if stream.String() != expected {
+			t.Fatalf("Expected %s, got %s", expected, stream.String())
+		}
+	}
+}
+
+func TestAppendByThree(t *testing.T) {
+	stream := BitStream{}
+	expected := ""
+	for i := 0; i < 1000; i++ {
+		stream.AppendUint(7, 3)
+		expected += "111"
+		if stream.String() != expected {
+			t.Logf("Backing store: %v\n", stream.debugDump())
+
+			t.Fatalf("Expected %s, got %s", expected, stream.String())
+		}
+	}
+}
+
+func TestAppendByFour(t *testing.T) {
+	stream := BitStream{}
+	expected := ""
+	for i := 0; i < 1000; i++ {
+		stream.AppendUint(15, 4)
+		expected += "1111"
+		if stream.String() != expected {
+			t.Fatalf("Expected %s, got %s", expected, stream.String())
+		}
+	}
+}
+
+func TestAppendByFive(t *testing.T) {
+	stream := BitStream{}
+	expected := ""
+	for i := 0; i < 1000; i++ {
+		stream.AppendUint(31, 5)
+		expected += "11111"
+		if stream.String() != expected {
+			t.Fatalf("Expected %s, got %s", expected, stream.String())
+		}
+	}
+}
+
+func TestAppendBySix(t *testing.T) {
+	stream := BitStream{}
+	expected := ""
+	for i := 0; i < 1000; i++ {
+		stream.AppendUint(63, 6)
+		expected += "111111"
+		if stream.String() != expected {
+			t.Fatalf("Expected %s, got %s", expected, stream.String())
+		}
+	}
+}
+func TestAppendBySeven(t *testing.T) {
+	stream := BitStream{}
+	expected := ""
+	for i := 0; i < 1000; i++ {
+		stream.AppendUint(127, 7)
+		expected += "1111111"
+		if stream.String() != expected {
+			t.Logf("Backing store: %v\n", stream.debugDump())
+			t.Fatalf("Expected %s, got %s", expected, stream.String())
+		}
+	}
+}
+
+func toBinaryString(n uint64, size int) string {
+	result := make([]byte, (size))
+	for i := 0; i < size; i++ {
+		if n&(1<<uint(size-i-1)) != 0 {
+			result[i] = '1'
+		} else {
+			result[i] = '0'
+		}
+	}
+	return string(result)
+
+}
+func TestAppendB32Patterns(t *testing.T) {
+	for n := uint64(1); n < 32; n++ {
+
+		stream := BitStream{}
+		expected := ""
+		for i := 0; i < 1000; i++ {
+			stream.AppendUint(n, 5)
+			expected += toBinaryString(n, 5)
+			if stream.String() != expected {
+				t.Fatalf("Expected %s, got %s", expected, stream.String())
+			}
+		}
 	}
 }

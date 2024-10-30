@@ -8,45 +8,43 @@ import (
 // Represents a stream of bits (not nesseciarily byte size or byte aligned)
 // Not in any way shape or form performant
 type BitStream struct {
-	nextBitIndex int
+	nextBitIndex uint
 	backingStore []byte
 }
 
 // Returns the number of bits inserted into the stream so far
-func (s *BitStream) Size() int {
+func (s *BitStream) Size() uint {
 	return s.nextBitIndex
 }
 
-
-
 // Returns the minimum number of bytes needed to represent bitcount bits
-func bytesNeededForBits(bitcount int) int {
+func bytesNeededForBits(bitcount uint) uint {
 	result := bitcount / 8
-	if bitcount % 8 != 0 {
+	if bitcount%8 != 0 {
 		result += 1
 	}
 	return result
 }
 
-// Returns the most signifigant n bits from b right shifted 
-func topNBits(b byte, n int) byte {
-	return (b >> (8-n))
-} 
+// Returns the most signifigant n bits from b right shifted
+func topNBits(b byte, n uint) byte {
+	return (b >> (8 - n))
+}
 
 // Returns the least signifigant
-func bottomNBits(b byte, n int) byte {
+func bottomNBits(b byte, n uint) byte {
 	return b & ((1 << n) - 1)
 }
 
 // Appends bits to the stream. They must be MSB justified
-func (s *BitStream) AppendBits(size int, bits []byte) {
-	if len(bits) < bytesNeededForBits(size) {
+func (s *BitStream) AppendBits(size uint, bits []byte) {
+	if (uint)(len(bits)) < bytesNeededForBits(size) {
 		panic(fmt.Sprintf("Too few bytes (%d) for %d bits (need %d)", len(bits), size, bytesNeededForBits(size)))
 	}
-	neededSize := s.nextBitIndex + size
+	neededSize := bytesNeededForBits(s.nextBitIndex + size)
 
 	// Ensure there is enough size
-	if s.backingStore == nil || len(s.backingStore) <= neededSize {
+	if s.backingStore == nil || (uint)(len(s.backingStore)) <= neededSize {
 		nextSize := 16
 		if s.backingStore != nil {
 			nextSize = len(s.backingStore) * 2
@@ -57,39 +55,41 @@ func (s *BitStream) AppendBits(size int, bits []byte) {
 	}
 	numFullBytes := size / 8
 
-	offset := s.nextBitIndex % 8
-	bitsLeftInByte := 8 - offset
+	offset := s.nextBitIndex % 8 // Offset in the current byte
+	bitsLeftInByte := 8 - offset // Number of bits left in the current byte
 
-	for _, bt := range(bits[:numFullBytes]) {
+	for _, bt := range bits[:numFullBytes] {
 		nextByteIndex := (s.nextBitIndex + 1) / 8
 		top := topNBits(bt, bitsLeftInByte)
 		bottom := bottomNBits(bt, offset)
 
 		s.backingStore[nextByteIndex] |= top
 		s.backingStore[nextByteIndex+1] |= bottom << bitsLeftInByte
-		s.nextBitIndex += 8		
+		s.nextBitIndex += 8
 	}
 
 	// Handle the last byte
-	if size % 8 != 0 {
+	if size%8 != 0 {
 		trailingBits := size % 8
 		topCount := min(trailingBits, bitsLeftInByte)
 		bottomCount := trailingBits - topCount
-		nextByteIndex := (s.nextBitIndex + 1) / 8
+		nextByteIndex := (s.nextBitIndex) / 8
 		top := topNBits(bits[numFullBytes], topCount)
 		shiftAmount := 8 - (s.nextBitIndex % 8) - topCount
 		if shiftAmount < 0 {
 			panic(fmt.Sprintf("Shift amount is negative: %d", shiftAmount))
 		}
-		top = top << shiftAmount
-		s.backingStore[nextByteIndex] |= top
+		shiftedTop := top << shiftAmount
+		s.backingStore[nextByteIndex] |= shiftedTop
+		s.nextBitIndex += topCount
+		nextByteIndex = (s.nextBitIndex) / 8
 
-		bottom := bottomNBits(bits[numFullBytes] << topCount, bottomCount)
-		s.backingStore[nextByteIndex] |= top
-		if bottomCount != 0 {
-			s.backingStore[nextByteIndex+1] |= bottom << (8 - bottomCount)
+		if 0 < bottomCount {
+			bottom := bottomNBits(bits[numFullBytes]>>(8-byte(topCount)-byte(bottomCount)), bottomCount)
+			shiftedBottom := bottom << (8 - bottomCount)
+			s.backingStore[nextByteIndex] |= shiftedBottom
+			s.nextBitIndex += bottomCount
 		}
-		s.nextBitIndex += trailingBits
 	}
 }
 
@@ -115,7 +115,7 @@ func (s *BitStream) AppendUint64(value uint64) {
 }
 
 // Appends a Uint to the stream
-func (s *BitStream) AppendUint(value uint64, size int) {
+func (s *BitStream) AppendUint(value uint64, size uint) {
 	if size > 64 {
 		panic("Size out of range")
 	}
@@ -131,7 +131,7 @@ func (s *BitStream) AppendUint(value uint64, size int) {
 }
 
 // Returns the bit at a given index
-func (s *BitStream) BitAt(index int) byte {
+func (s *BitStream) BitAt(index uint) byte {
 	if index >= s.nextBitIndex {
 		panic(fmt.Sprintf("Index %d is out of bounds", index))
 	}
@@ -141,33 +141,33 @@ func (s *BitStream) BitAt(index int) byte {
 }
 
 // Returns the MSB justified size bits at given index
-func (s *BitStream) BitsAt(index int, size int) []byte {
-	if index + size > s.nextBitIndex {
+func (s *BitStream) BitsAt(index uint, size uint) []byte {
+	if index+size > s.nextBitIndex {
 		panic(fmt.Sprintf("Index %d is out of bounds", index))
 	}
 	resultSize := bytesNeededForBits(size)
 	result := make([]byte, resultSize)
 	byteIndex := 0
 	shift := 7
-	for i := 0; i < size; i++ {
+	for i := uint(0); i < size; i++ {
 		if shift < 0 {
 			byteIndex++
 			shift = 7
 		}
-		result[byteIndex] |= s.BitAt(index + i) << shift
+		result[byteIndex] |= s.BitAt(index+i) << shift
 		shift--
 	}
-	return result	
+	return result
 }
 
 // Interprets the (possibly unaligned) bits at a given index as a uint64
-func (s *BitStream) Uint64At(index int) uint64 {
+func (s *BitStream) Uint64At(index uint) uint64 {
 	data := s.BitsAt(index, 64)
 	return binary.BigEndian.Uint64(data)
 }
 
 // Interprets the (possibly unaligned) size bits at a given index as a uint64)
-func (s *BitStream) UintAt(index int, size int) uint64 {
+func (s *BitStream) UintAt(index uint, size uint) uint64 {
 	if size > 64 {
 		panic("Size is too big")
 	}
@@ -181,9 +181,18 @@ func (s *BitStream) UintAt(index int, size int) uint64 {
 // Returns a string representation of the bitstream
 func (s *BitStream) String() string {
 	result := ""
-	for i := 0; i < s.nextBitIndex; i++ {
+	for i := uint(0); i < s.nextBitIndex; i++ {
 		result += fmt.Sprintf("%d", s.BitAt(i))
 	}
+	return result
+}
+
+func (s *BitStream) debugDump() string {
+	result := ""
+	for i := uint(0); i < bytesNeededForBits(s.nextBitIndex); i++ { // Loop through bytes
+		result += fmt.Sprintf("%08b ", s.backingStore[i])
+	}
+
 	return result
 }
 
@@ -192,11 +201,65 @@ func (s *BitStream) AppendBitstream(other *BitStream) {
 	s.AppendBits(other.Size(), other.backingStore)
 }
 
+func (s *BitStream) Concat(other *BitStream) *BitStream {
+	result := &BitStream{}
+	result.backingStore = make([]byte, bytesNeededForBits(s.Size()+other.Size()))
+	copy(result.backingStore, s.backingStore)
+	result.nextBitIndex = s.nextBitIndex
+	result.AppendBitstream(other)
+	return result
+}
+
 // Returns a byte array representation of the bitstream.
 // The size is the minimum number of bytes needed to represent the bits
 func (s *BitStream) ToBytes() []byte {
 	size := s.Size()
 	result := make([]byte, bytesNeededForBits(size))
 	copy(result, s.backingStore)
+	return result
+}
+
+const base32Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+
+var base32Reversed map[byte]byte
+
+func ensureBase32Reversed() {
+	if base32Reversed == nil {
+		base32Reversed = make(map[byte]byte)
+		for i := 0; i < len(base32Alphabet); i++ {
+			base32Reversed[base32Alphabet[i]] = byte(i)
+		}
+	}
+}
+
+func (s *BitStream) MarshalBase32() string {
+	if s.Size()%5 != 0 {
+		panic(fmt.Sprintf("Bitstream size must be a multiple of 5 for base32 encoding, got %d", s.Size()))
+	}
+	result := ""
+	for i := uint(0); i < s.nextBitIndex; i += 5 {
+		value := s.UintAt(i, 5)
+		result += string(base32Alphabet[uint(value)])
+	}
+	return result
+}
+
+func (s *BitStream) UnmarshalBase32(encoded string) error {
+	s.backingStore = nil
+	s.nextBitIndex = 0
+	ensureBase32Reversed() // Ensure the base32 reverse map is initialized
+	for i := 0; i < len(encoded); i++ {
+		value, ok := base32Reversed[encoded[i]]
+		if !ok {
+			return fmt.Errorf("invalid base32 character: %c", encoded[i])
+		}
+		s.AppendUint(uint64(value), 5)
+	}
+	return nil
+}
+
+func (s *BitStream) BitstreamAt(index uint, size uint) *BitStream {
+	result := &BitStream{}
+	result.AppendBits(size, s.BitsAt(index, size))
 	return result
 }
