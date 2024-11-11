@@ -3,6 +3,7 @@ package smallcurve
 import (
 	"encoding/binary"
 	"fmt"
+	"math/big"
 )
 
 // Represents a stream of bits (not nesseciarily byte size or byte aligned)
@@ -261,5 +262,45 @@ func (s *BitStream) UnmarshalBase32(encoded string) error {
 func (s *BitStream) BitstreamAt(index uint, size uint) *BitStream {
 	result := &BitStream{}
 	result.AppendBits(size, s.BitsAt(index, size))
+	return result
+}
+
+func (s *BitStream) AppendBigInt(value *big.Int, nbits uint) {
+	if value.BitLen() > int(nbits) {
+		panic(fmt.Sprintf("Value is too big for %d bits", nbits))
+	}
+	bytes := make([]byte, (nbits+7)/8)
+	value.FillBytes(bytes)
+
+	offset := nbits % 8
+
+	if offset == 0 {
+		s.AppendBits(nbits, bytes)
+		return
+	}
+	firstByte := uint64(bytes[0])
+	s.AppendUint(firstByte, offset)
+
+	remainingSize := nbits - offset
+	fmt.Printf("Remaining size: %d, size of remaining bytes: %d\n", remainingSize, len(bytes[1:]))
+	remainingBytes := bytes[1:]
+	fmt.Printf("Remaining bytes: %v\n", remainingBytes)
+	s.AppendBits(remainingSize, remainingBytes)
+}
+
+func (s *BitStream) BigIntAt(index uint, nbits uint) *big.Int {
+	offset := nbits % 8
+	var resultBytes []byte
+	if offset == 0 {
+		resultBytes = s.BitsAt(index, nbits)
+	} else {
+		firstByte := s.UintAt(index, offset)
+		remainingBytes := s.BitsAt(index+offset, nbits-offset)
+		fmt.Printf("Remaining bytes: %v\n", remainingBytes)
+		resultBytes = append([]byte{byte(firstByte)}, remainingBytes...)
+	}
+
+	result := new(big.Int)
+	result.SetBytes(resultBytes)
 	return result
 }

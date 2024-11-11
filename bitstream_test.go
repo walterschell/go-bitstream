@@ -1,6 +1,7 @@
 package smallcurve
 
 import (
+	"math/big"
 	"testing"
 )
 
@@ -174,4 +175,29 @@ func TestAppendB32Patterns(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestAppendBigInt(t *testing.T) {
+	value := big.NewInt(7)
+
+	for i := 3; i < 20; i++ {
+		stream := BitStream{}
+		stream.AppendBigInt(value, uint(i))
+
+		expected := ""
+		for j := 3; j < i; j++ {
+			expected += "0"
+		}
+		expected += "111"
+
+		if stream.String() != expected {
+			t.Fatalf("(i=%d) Expected %s, got %s", i, expected, stream.String())
+		}
+		extracted := stream.BigIntAt(0, uint(i))
+		if extracted.Cmp(value) != 0 {
+			t.Fatalf("(i=%d) Expected 7, got %d", i, extracted)
+		}
+
+	}
+
 }
