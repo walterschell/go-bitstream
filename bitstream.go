@@ -114,9 +114,6 @@ func (s *BitStream) AppendBits(size uint, bits []byte) {
 		nextByteIndex := (s.nextBitIndex) / 8
 		top := topNBits(bits[numFullBytes], topCount)
 		shiftAmount := 8 - (s.nextBitIndex % 8) - topCount
-		if shiftAmount < 0 {
-			panic(fmt.Sprintf("Shift amount is negative: %d", shiftAmount))
-		}
 		shiftedTop := top << shiftAmount
 		s.backingStore[nextByteIndex] |= shiftedTop
 		s.nextBitIndex += topCount
