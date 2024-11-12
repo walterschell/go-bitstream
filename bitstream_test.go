@@ -1,4 +1,4 @@
-package smallcurve
+package bitstream
 
 import (
 	"math/big"

@@ -1,4 +1,41 @@
-package smallcurve
+/*
+Package bitstream provides a toy library for bit-level marshaling and
+unmarshaling.
+
+This package is designed to handle streams of bits, which are not necessarily
+byte-sized or byte-aligned. It includes various utilities for appending and
+extracting bits, integers, and big integers to and from a bitstream. The package
+also supports base32 encoding and decoding.
+
+The BitStream type represents a stream of bits with methods to manipulate and
+query the bitstream.
+
+Key Features:
+- Append and extract individual bits, bytes, and integers.
+- Support for appending and extracting big integers.
+- Base32 encoding and decoding.
+- Utility functions for bit manipulation.
+
+Note: This package is not optimized for performance and is intended for
+educational or experimental purposes.
+
+Example usage:
+
+    package main
+
+    import (
+        "fmt"
+        "github.com/walterschell/go-bitstream"
+    )
+
+    func main() {
+        stream := bitstream.BitStream{}
+        stream.AppendUint(255, 8)
+        fmt.Println(stream.String()) // Output: 11111111
+    }
+
+*/
+package bitstream
 
 import (
 	"encoding/binary"
@@ -60,7 +97,7 @@ func (s *BitStream) AppendBits(size uint, bits []byte) {
 	bitsLeftInByte := 8 - offset // Number of bits left in the current byte
 
 	for _, bt := range bits[:numFullBytes] {
-		nextByteIndex := (s.nextBitIndex + 1) / 8
+		nextByteIndex := s.nextBitIndex / 8
 		top := topNBits(bt, bitsLeftInByte)
 		bottom := bottomNBits(bt, offset)
 
@@ -202,6 +239,7 @@ func (s *BitStream) AppendBitstream(other *BitStream) {
 	s.AppendBits(other.Size(), other.backingStore)
 }
 
+// Returns a new BitStream that is a copy of s with other appended to it
 func (s *BitStream) Concat(other *BitStream) *BitStream {
 	result := &BitStream{}
 	result.backingStore = make([]byte, bytesNeededForBits(s.Size()+other.Size()))
@@ -233,6 +271,8 @@ func ensureBase32Reversed() {
 	}
 }
 
+
+// Marshals the bitstream as a base32 string. The bitstream length must be a multiple of 5
 func (s *BitStream) MarshalBase32() string {
 	if s.Size()%5 != 0 {
 		panic(fmt.Sprintf("Bitstream size must be a multiple of 5 for base32 encoding, got %d", s.Size()))
@@ -245,6 +285,7 @@ func (s *BitStream) MarshalBase32() string {
 	return result
 }
 
+// Unmarshals a base32 string. 
 func (s *BitStream) UnmarshalBase32(encoded string) error {
 	s.backingStore = nil
 	s.nextBitIndex = 0
@@ -259,12 +300,14 @@ func (s *BitStream) UnmarshalBase32(encoded string) error {
 	return nil
 }
 
+// Returns a new BitStream from the given slice of s
 func (s *BitStream) BitstreamAt(index uint, size uint) *BitStream {
 	result := &BitStream{}
 	result.AppendBits(size, s.BitsAt(index, size))
 	return result
 }
 
+// Appends a BigInt into the bitstream. nbits must set explicitly to allow unambigous unmarshalling
 func (s *BitStream) AppendBigInt(value *big.Int, nbits uint) {
 	if value.BitLen() > int(nbits) {
 		panic(fmt.Sprintf("Value is too big for %d bits", nbits))
@@ -282,12 +325,12 @@ func (s *BitStream) AppendBigInt(value *big.Int, nbits uint) {
 	s.AppendUint(firstByte, offset)
 
 	remainingSize := nbits - offset
-	fmt.Printf("Remaining size: %d, size of remaining bytes: %d\n", remainingSize, len(bytes[1:]))
 	remainingBytes := bytes[1:]
-	fmt.Printf("Remaining bytes: %v\n", remainingBytes)
 	s.AppendBits(remainingSize, remainingBytes)
 }
 
+
+// Extracts a BigInt from a BitStream
 func (s *BitStream) BigIntAt(index uint, nbits uint) *big.Int {
 	offset := nbits % 8
 	var resultBytes []byte
@@ -296,7 +339,6 @@ func (s *BitStream) BigIntAt(index uint, nbits uint) *big.Int {
 	} else {
 		firstByte := s.UintAt(index, offset)
 		remainingBytes := s.BitsAt(index+offset, nbits-offset)
-		fmt.Printf("Remaining bytes: %v\n", remainingBytes)
 		resultBytes = append([]byte{byte(firstByte)}, remainingBytes...)
 	}
 
